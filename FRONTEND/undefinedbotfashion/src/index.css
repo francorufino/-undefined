@@ -1,0 +1,30 @@
+@import url('https://fonts.googleapis.com/css2?family=Bitcount+Prop+Single+Ink:wght@100..900&family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..900;1,6..96,400..900&family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap');
+@import "tailwindcss";
+
+* {
+  box-sizing: border-box;
+}
+a {
+  text-decoration: none;
+  color: inherit;
+  font-family: 'Bodoni Moda', serif;
+}
+button {
+  cursor: pointer;
+}
+img {
+  display: block;
+  max-width: 100%;
+}
+
+html, body, #root, .app{
+  height: 100%;
+  width: 100%;
+  font-family: 'Montserrat', sans-serif;
+  @apply text-[#f7f7f7];
+  @apply bg-[#012326];
+}
+
+h1, h2, h3, h4, h5, h6 {
+  /* font-family: 'Bitcount Prop Single Ink', sans-serif; */
+}
