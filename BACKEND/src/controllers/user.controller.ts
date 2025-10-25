@@ -12,31 +12,7 @@ export async function getUsersSemAge(req: Request, res: Response) {
 }
 
 export async function getUsers(req: Request, res: Response) {
-  const { authorization} = req.headers;
-  const token = authorization?.split(" ")[1]; //[Bearer token]
-  if(!token) return res.status(401).json({message: "Token not found"});
   
-  const payload = await verifyToken(token);
-
-//pegar o role by id do token
-  // const user = await userService.getUserById(role?.id as string);
-  // return res.status(200).json({user});
-
-//pra pegar o id do user que tá no token
-const userId = payload?.id;
-const userRole = payload?.role;
-console.log("User ID from token:", userId, "user role:", userRole);
-
-
-  //SOMENTE O ADMIN PODE VER TODOS OS USUÁRIOS:
-  if(payload?.role !== "admin"){
-    return res.status(401).json ({message: "Unauthorized"});
-  }
-//
-
-
-
-
   try {
     const users = await userService.getUsers();
     return res.status(200).json(users);

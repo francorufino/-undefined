@@ -1,6 +1,6 @@
 import { IUserResponse } from "../interfaces/IUserResponse.js";
 import { User } from "../models/user.model.js";
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import { UserRole } from "../interfaces/UserRole.js";
 import {IUser} from "../interfaces/IUser.js";
 import { log } from "console";
@@ -63,7 +63,7 @@ export async function login(user: IUserLogin): Promise<IToken | null>{
     if(!existingUser) return null;
     const isMatch = await bcrypt.compare(user.password, existingUser.password);
     if(!isMatch) return null;
-    const token = createToken({id: existingUser._id as unknown as string, role: existingUser.role}); 
+    const token = createToken({id: existingUser._id as unknown as string, role: existingUser.role!}); 
     return {token};
 
   } catch(error) {
