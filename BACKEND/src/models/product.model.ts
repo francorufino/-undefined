@@ -27,11 +27,11 @@ const productSchema = new mongoose.Schema({
     required: true,
   },
     imagemUrl: {
-    type: String,
+    type: [String],
     required: false,
   },
    videoUrl: {
-    type: String,
+    type: [String],
     required: false,
   },
   onSale: {

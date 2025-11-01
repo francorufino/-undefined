@@ -1,6 +1,5 @@
 import { Request, Response } from "express";
 import * as userService from "../services/user.service.js";
-import { verifyToken } from "../middlewares/auth.middleware.js";
 
 export async function getUsersSemAge(req: Request, res: Response) {
   try {
@@ -32,3 +31,4 @@ export async function getUserById(req: Request, res: Response) {
     return res.status(500).json({ message: "Internal Server Error" }); 
   }
 }
+

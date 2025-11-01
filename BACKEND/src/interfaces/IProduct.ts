@@ -4,8 +4,8 @@ export interface IProduct{
   price: number;
   modelRobot: ModelRobot;
   stock: number;
-  imagemUrl?: string;
-  videoUrl?: string;
+  imagemUrl?: string[];
+  videoUrl?: string[];
   onSale?: boolean;
 }
 

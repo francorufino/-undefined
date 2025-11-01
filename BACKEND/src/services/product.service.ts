@@ -1,3 +1,4 @@
+import { IProduct } from "../interfaces/IProduct";
 import { Product } from "../models/product.model";
 
 export async function getProducts(){
@@ -8,3 +9,14 @@ export async function getProducts(){
     return null;
   }
 }
+
+export async function createProduct(productData: IProduct): Promise<IProduct | null> {
+  try {
+    
+    const savedProduct = await Product.create(productData);
+    return savedProduct;
+  } catch (error) {
+    console.error("Error creating product:", error);
+    throw new Error("Error creating product");
+  }
+} 
