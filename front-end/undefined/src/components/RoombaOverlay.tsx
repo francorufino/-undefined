@@ -1,11 +1,12 @@
+// src/components/RoombaOverlay.tsx
 import React, { useEffect, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
 type Props = {
   startRef: React.RefObject<HTMLElement>;
   src?: string;
-  speed?: number;     // px/s
-  widthPx?: number;   // px
+  speed?: number;     // px/s (linear)
+  widthPx?: number;   // px (largura renderizada)
 };
 
 export default function RoombaOverlay({
@@ -16,31 +17,35 @@ export default function RoombaOverlay({
 }: Props) {
   const botRef = useRef<HTMLImageElement | null>(null);
 
+  // Centro do bot (para colisão com viewport)
+  const pos = useRef<{ cx: number; cy: number }>({ cx: 0, cy: 0 });
+
+  // Metade do tamanho renderizado
   const halfW = useRef(0);
   const halfH = useRef(0);
-  const angleRef = useRef(0);
-  const angleTargetRef = useRef(0);
 
-  const cursorRef = useRef<{ x: number; y: number }>({
-    x: window.innerWidth / 2,
-    y: window.innerHeight / 2,
-  });
+  // Ângulos (radianos). IMPORTANTE: não normalizamos (mantemos acumulado).
+  const angle = useRef(0);         // orientação atual
+  const angleTarget = useRef(0);   // orientação alvo (acumulada)
 
-  const isActive = useRef(true); 
+  // Estado
+  const mode = useRef<'init' | 'move' | 'rotate'>('init');
 
-   useLayoutEffect(() => {
+  /* ---------- init visual ---------- */
+  useLayoutEffect(() => {
     const bot = botRef.current;
     if (bot) bot.style.visibility = 'hidden';
   }, []);
 
-   useLayoutEffect(() => {
+  // calcula halfW/halfH
+  useLayoutEffect(() => {
     const bot = botRef.current;
     if (!bot) return;
 
     function computeHalf() {
       const natW = bot.naturalWidth || 1;
       const natH = bot.naturalHeight || 1;
-      const scale = (widthPx ?? 120) / natW;
+      const scale = (widthPx ?? 10) / natW;
       halfW.current = (natW * scale) / 2;
       halfH.current = (natH * scale) / 2;
     }
@@ -52,16 +57,17 @@ export default function RoombaOverlay({
     }
   }, [widthPx]);
 
+  // posiciona inicial e heading
   useLayoutEffect(() => {
     const bot = botRef.current;
     if (!bot) return;
 
     let cancelled = false;
 
-    function place() {
+    const place = () => {
       if (cancelled) return;
       const el = startRef.current;
-      if (!el) {
+      if (!el || !halfW.current || !halfH.current) {
         requestAnimationFrame(place);
         return;
       }
@@ -69,32 +75,28 @@ export default function RoombaOverlay({
       const r = el.getBoundingClientRect();
       const startCx = r.left - 40;
       const startCy = r.top + r.height * 0.5 - 30;
-      const startX = startCx - halfW.current;
-      const startY = startCy - halfH.current;
 
-      const dx0 = cursorRef.current.x - startCx;
-      const dy0 = cursorRef.current.y - startCy;
-      const a0 = Math.atan2(dy0, dx0);
+      const cx = clamp(startCx, halfW.current, window.innerWidth  - halfW.current);
+      const cy = clamp(startCy, halfH.current, window.innerHeight - halfH.current);
 
-      angleRef.current = a0;
-      angleTargetRef.current = a0;
+      pos.current = { cx, cy };
 
-      bot.style.transform = `translate3d(${startX}px, ${startY}px, 0) rotate(${angleRef.current + OFFSET_RAD}rad)`;
+      // Ângulo inicial apontando para dentro (valor dentro de [-π, π] só no start)
+      const a0 = pickInwardAngle(cx, cy);
+      angle.current = a0;
+      angleTarget.current = a0;
+      mode.current = 'move';
+
+      applyTransform();
       bot.style.visibility = 'visible';
-    }
-
-    const ensureHalfAndPlace = () => {
-      if (halfW.current === 0 || halfH.current === 0) {
-        requestAnimationFrame(ensureHalfAndPlace);
-      } else {
-        place();
-      }
     };
-    ensureHalfAndPlace();
+
+    place();
 
     return () => { cancelled = true; };
   }, [startRef, widthPx]);
 
+  /* ---------- loop ---------- */
   useEffect(() => {
     const bot = botRef.current;
     if (!bot) return;
@@ -102,114 +104,127 @@ export default function RoombaOverlay({
     let raf = 0;
     let last = performance.now();
 
-    const pos = { x: 0, y: 0 };
-    {
-      const m = /translate3d\(([-\d.]+)px,\s*([-\d.]+)px/i.exec(bot.style.transform || '');
-      if (m) {
-        pos.x = parseFloat(m[1]);
-        pos.y = parseFloat(m[2]);
-      }
+    function onResize() {
+      const { cx, cy } = pos.current;
+      pos.current.cx = clamp(cx, halfW.current, window.innerWidth  - halfW.current);
+      pos.current.cy = clamp(cy, halfH.current, window.innerHeight - halfH.current);
+      applyTransform();
     }
+    window.addEventListener('resize', onResize);
 
-       function onPointerMove(e: PointerEvent) {
-      if (!isActive.current) return; // só atualiza se estiver dentro
-      cursorRef.current.x = e.clientX;
-      cursorRef.current.y = e.clientY;
-    }
-
-    function onMouseEnter() {
-      isActive.current = true;
-    }
-
-    function onMouseLeave() {
-      isActive.current = false;
-    }
-
-    window.addEventListener('pointermove', onPointerMove, { passive: true });
-    window.addEventListener('mouseenter', onMouseEnter);
-    window.addEventListener('mouseleave', onMouseLeave);
-
-    function clamp(v: number, a: number, b: number) {
-      return Math.max(a, Math.min(b, v));
-    }
-    function shortestDelta(curr: number, targ: number) {
-      let d = targ - curr;
-      while (d > Math.PI) d -= 2 * Math.PI;
-      while (d < -Math.PI) d += 2 * Math.PI;
-      return d;
-    }
-
-     function loop(now: number) {
+    const tick = (now: number) => {
       const dt = Math.min((now - last) / 1000, 0.05);
       last = now;
 
-      if (isActive.current) {
-        const targetTopLeftX = cursorRef.current.x - halfW.current;
-        const targetTopLeftY = cursorRef.current.y - halfH.current;
-        const dx = targetTopLeftX - pos.x;
-        const dy = targetTopLeftY - pos.y;
-        const dist = Math.hypot(dx, dy);
-
-        if (dist > POS_EPS) {
-          const step = Math.min((speed ?? 240) * dt, dist);
-          pos.x += (dx / dist) * step;
-          pos.y += (dy / dist) * step;
-          bot.classList.add('moving');
-        } else {
-          pos.x = targetTopLeftX;
-          pos.y = targetTopLeftY;
-          bot.classList.remove('moving');
-        }
-
-        const cx = pos.x + halfW.current;
-        const cy = pos.y + halfH.current;
-        const vdx = cursorRef.current.x - cx;
-        const vdy = cursorRef.current.y - cy;
-        const distToCursor = Math.hypot(vdx, vdy);
-
-        if (distToCursor > ANGLE_FREEZE_DIST) {
-          angleTargetRef.current = Math.atan2(vdy, vdx);
-        }
-
-        const distFactor = clamp(distToCursor / TURN_DIST_REF, 0, 1);
-        const tau = TAU_NEAR + (TAU_FAR - TAU_NEAR) * (1 - distFactor);
-        const alpha = 1 - Math.exp(-dt / tau);
-
-        const turnRateDeg =
-          MAX_TURN_RATE_DEG_NEAR +
-          (MAX_TURN_RATE_DEG_FAR - MAX_TURN_RATE_DEG_NEAR) * distFactor;
-        const maxTurn = (turnRateDeg * DEG2RAD) * dt;
-
-        const delta = shortestDelta(angleRef.current, angleTargetRef.current);
-        let turn = delta * alpha;
-        turn = clamp(turn, -maxTurn, maxTurn);
-        angleRef.current += turn;
+      if (mode.current === 'move') {
+        stepMove(dt);
+      } else if (mode.current === 'rotate') {
+        stepRotateCWAccum(dt); // gira sempre clockwise até atingir o alvo acumulado
       }
 
-      bot.style.transform = `translate3d(${pos.x}px, ${pos.y}px, 0) rotate(${angleRef.current + OFFSET_RAD}rad)`;
+      raf = requestAnimationFrame(tick);
+    };
 
-      raf = requestAnimationFrame(loop);
-    }
-
-    raf = requestAnimationFrame((t) => {
-      last = t;
-      raf = requestAnimationFrame(loop);
-    });
+    raf = requestAnimationFrame((t) => { last = t; raf = requestAnimationFrame(tick); });
 
     return () => {
-      window.removeEventListener('pointermove', onPointerMove);
-      window.removeEventListener('mouseenter', onMouseEnter);
-      window.removeEventListener('mouseleave', onMouseLeave);
+      window.removeEventListener('resize', onResize);
       cancelAnimationFrame(raf);
     };
   }, [speed, widthPx]);
 
+  /* ---------- movimento retilíneo ---------- */
+  function stepMove(dt: number) {
+    const v = speed ?? 10;
+    const dirX = Math.cos(angle.current);
+    const dirY = Math.sin(angle.current);
+
+    let nx = pos.current.cx + dirX * v * dt;
+    let ny = pos.current.cy + dirY * v * dt;
+
+    let hit: 'left' | 'right' | 'top' | 'bottom' | null = null;
+
+    if (nx <= halfW.current) { nx = halfW.current; hit = 'left'; }
+    else if (nx >= window.innerWidth - halfW.current) { nx = window.innerWidth - halfW.current; hit = 'right'; }
+
+    if (ny <= halfH.current) { ny = halfH.current; hit = hit ?? 'top'; }
+    else if (ny >= window.innerHeight - halfH.current) { ny = window.innerHeight - halfH.current; hit = hit ?? 'bottom'; }
+
+    pos.current.cx = nx;
+    pos.current.cy = ny;
+    applyTransform();
+
+    if (hit) {
+      // Sem reset: soma SEMPRE +75° ao alvo acumulado (clockwise)
+      angleTarget.current = angleTarget.current + ROTATE_STEP_RAD;
+      mode.current = 'rotate';
+    }
+  }
+
+  /* ---------- rotação parada sempre clockwise acumulada ---------- */
+  function stepRotateCWAccum(dt: number) {
+    // resto a girar (sempre positivo, porque alvo só cresce)
+    const remaining = angleTarget.current - angle.current;
+
+    // quando falta ~1°, termina
+    if (remaining <= (1 * DEG2RAD)) {
+      angle.current = angleTarget.current;
+      mode.current = 'move';
+      applyTransform();
+      return;
+    }
+
+    // passo máximo por frame (deg/s -> rad/frame)
+    const maxTurn = (MAX_TURN_RATE_DEG_NEAR * DEG2RAD) * dt;
+
+    // avança no sentido horário (positivo) sem NUNCA inverter
+    const step = Math.min(remaining, maxTurn);
+    angle.current = angle.current + step;
+
+    applyTransform();
+  }
+
+  /* ---------- transform ---------- */
+  function applyTransform() {
+    const bot = botRef.current;
+    if (!bot) return;
+    const x = pos.current.cx - halfW.current;
+    const y = pos.current.cy - halfH.current;
+    // Usamos angle acumulado diretamente; CSS lida com ângulos grandes.
+    bot.style.transform = `translate3d(${x}px, ${y}px, 0) rotate(${angle.current + OFFSET_RAD}rad)`;
+  }
+
+  /* ---------- util ---------- */
+  function clamp(v: number, a: number, b: number) { return Math.max(a, Math.min(b, v)); }
+
+  function normalizeAngle(a: number) {
+    while (a <= -Math.PI) a += 2 * Math.PI;
+    while (a >   Math.PI) a -= 2 * Math.PI;
+    return a;
+  }
+
+  // ângulo inicial “para dentro” do viewport
+  function pickInwardAngle(cx: number, cy: number): number {
+    const leftD   = cx - halfW.current;
+    const rightD  = (window.innerWidth  - halfW.current) - cx;
+    const topD    = cy - halfH.current;
+    const bottomD = (window.innerHeight - halfH.current) - cy;
+
+    const horizBase = rightD >= leftD ? 0 : Math.PI;            // +X ou -X
+    const vertBase  = bottomD >= topD ? Math.PI/2 : -Math.PI/2; // +Y ou -Y
+
+    const base = Math.random() < 0.5 ? horizBase : vertBase;
+    const jitter = (Math.random() - 0.5) * Math.PI; // ±90°
+    return normalizeAngle(base + jitter);
+  }
+
+  /* ---------- render ---------- */
   return createPortal(
     <img
       ref={botRef}
       className="roomba-bot roomba-fixed"
       src={src}
-      alt="Roomba bot following cursor"
+      alt="Roomba wandering"
       draggable={false}
       style={{
         width: `${widthPx}px`,
@@ -224,12 +239,18 @@ export default function RoombaOverlay({
   );
 }
 
-const OFFSET_RAD = (90 * Math.PI) / 180;
+/* ================== PARÂMETROS (mantendo seus presets) ================== */
+const OFFSET_RAD = (90 * Math.PI) / 180; // frente → direita
 const POS_EPS = 0.6;
-const TURN_DIST_REF = 5;
-const TAU_NEAR = 0.01;
-const TAU_FAR = 0.01;
-const MAX_TURN_RATE_DEG_NEAR = 50;
-const MAX_TURN_RATE_DEG_FAR = 50;
-const ANGLE_FREEZE_DIST = 4;
+
+const TURN_DIST_REF = 5;         // mantido (não usado aqui)
+const TAU_NEAR = 0.01;           // mantido (não usado aqui)
+const TAU_FAR  = 0.01;           // mantido (não usado aqui)
+const MAX_TURN_RATE_DEG_NEAR = 50; // deg/s para rotação parada
+const MAX_TURN_RATE_DEG_FAR  = 50; // mantido
+const ANGLE_FREEZE_DIST = 4;       // mantido
+
+const ROTATE_STEP_DEG = 75;
+const ROTATE_STEP_RAD = (ROTATE_STEP_DEG * Math.PI) / 180;
+
 const DEG2RAD = Math.PI / 180;
