@@ -10,8 +10,19 @@ export const productSchema = z.object({
   price: z.number()
     .min(0.01, "Price must be at least 0.01")
     .max(10000, "Price must be at most 10000"),
-  modelRobot: z.enum(["Humanoid", "Pet", "Vacuum"], "ModelRobot must be one of: Humanoid, Pet, Vacuum"),
-   onSale: z.boolean(),
+  modelRobot: 
+  z.preprocess((arg) => {
+    if (typeof arg === "string") {
+      return [arg.toUpperCase()];
+    }
+    if (Array.isArray(arg)) {
+      return arg.map((model) => {
+        String(model).toUpperCase();
+      })
+    }
+        return arg;
+  }, z.array(z.enum(["HUMANOID", "PET", "VACUUM"], "Each ModelRobot must be one of: HUMANOID, PET, VACUUM"))),
+     onSale: z.boolean(),
    stock: z.number().min(1, "Stock must be at least 1"),
   imagemUrl: z.string()
     .url("Image URL must be a valid URL")

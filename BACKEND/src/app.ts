@@ -6,6 +6,7 @@ import { connectDB } from './config/db.js';
 import cors from 'cors';
 import productRouter from './routes/product.router.js';
 import path from 'path';
+import purchaseRouter from './routes/purchase.router.js';
 
 const app = express();
 
@@ -20,5 +21,6 @@ app.use ("/hello", helloRouter);
 app.use("/auth", authRouter); 
 app.use ("/users", userRouter);
 app.use("/products", productRouter); 
+app.use("/purchases", purchaseRouter);
 
 export default app;

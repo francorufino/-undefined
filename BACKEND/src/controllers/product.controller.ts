@@ -32,3 +32,36 @@ export async function createProduct(req: Request, res: Response) {
     return res.status(500).json({ message: "Internal Server Error" });
 }
 }
+
+export async function getProductsById(req: Request, res: Response) {
+  console.log(req);
+  try {
+   const product = await productService.getProductsById(req.params.id)
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+    return res.status(200).json(product);
+  } catch (error: any) {
+    if(error.message === "Invalid ID format from MongoDB"){
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+}
+
+export async function deleteProduct(req: Request, res: Response){
+  // try {
+    const id = req.params.id;
+    const product = await productService.deleteProduct(id);
+    console.log(product)
+    if(!product){
+      return res.status(404).json({message: "Product not found"});
+    }
+    return res.status(200).json({message: "Product deleted successfully"});
+  // } catch (error: any) {
+  //   if(error.message === "Invalid ID format from MongoDB"){
+  //     return res.status(400).json({ message: error.message });
+  //   }
+  //   return res.status(500).json({ message: "Internal Server Error" });
+  // }  
+}

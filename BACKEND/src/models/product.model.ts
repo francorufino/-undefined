@@ -22,9 +22,10 @@ const productSchema = new mongoose.Schema({
     min: 10,
   },
   modelRobot: {
-    type: String,
+    type: [String],
     enum: ["Humanoid", "Pet", "Vacuum"],
     required: true,
+    set: (models: string[]) => models.map(model => model.toUpperCase()) 
   },
     imagemUrl: {
     type: [String],
@@ -37,7 +38,12 @@ const productSchema = new mongoose.Schema({
   onSale: {
     type: Boolean,
     default: false
+  },
+  isActive:{
+    type: Boolean,
+    default: true
   }
+
 });
 
 export const Product = mongoose.model<IProduct>("Product", productSchema);
