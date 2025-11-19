@@ -6,4 +6,12 @@ export interface IPurchase {
   quantity: number;
   totalPrice: number;
   status: ["pending", "completed", "canceled"];
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface IPurchaseCreated {
+  userId: string;
+  productId: string;
+  quantity: number;
 }

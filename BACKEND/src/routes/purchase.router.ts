@@ -5,8 +5,8 @@ import { authenticate } from "../middlewares/auth.middleware.js";
 const router = Router();
 
 router.get("/", authenticate, purchaseController.getPurchase);
-// router.post("/", authenticate, purchaseController.createPurchase);
-// router.get("/:id", authenticate,purchaseController.getPurchaseById);
+router.post("/", authenticate, purchaseController.createPurchase);
+router.get("/:id", authenticate,purchaseController.getPurchaseById);
 // router.delete("/:id", authenticate,purchaseController.deletePurchase);
 
 export default router;
