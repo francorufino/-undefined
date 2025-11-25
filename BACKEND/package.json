@@ -29,6 +29,7 @@
   "dependencies": {
     "@types/cors": "^2.8.19",
     "@types/multer": "^2.0.0",
+    "@types/socket.io": "^3.0.1",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.2",

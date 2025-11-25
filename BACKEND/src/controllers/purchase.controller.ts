@@ -79,3 +79,26 @@ export async function createPurchase(req: Request, res: Response) {
   }
 }
 
+export async function deletePurchase(req: Request, res: Response) {
+
+  try {
+    const user = req.user;
+    const {id} = req.params;
+
+    if(!user){
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const deletedPurchase = await purchaseService.deletePurchase(id, user.id, user.role);
+    return res.status(200).json(deletedPurchase);
+
+  } catch (error: string | any) {
+    if(error.message === "Purchase not found"){
+      return res.status(404).json({ message: error.message});
+    }
+    if(error.message === "Unauthorized - you dont have permission to delete this purchase"){
+      return res.status(404).json({ message: error.message}); 
+    }
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+}
+

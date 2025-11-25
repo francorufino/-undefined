@@ -5,7 +5,7 @@ export interface IPurchase {
   productId: moongose.Types.ObjectId;
   quantity: number;
   totalPrice: number;
-  status: ["pending", "completed", "canceled"];
+  status: "pending" | "completed" | "canceled";
   createdAt?: Date;
   updatedAt?: Date;
 }
