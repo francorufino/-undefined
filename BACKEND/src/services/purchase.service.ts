@@ -69,6 +69,7 @@ export async function createPurchase(purchaseData:  IPurchaseCreated){
     }], {session});
     await session.commitTransaction();
     session.endSession();
+    
     return newPurchase[0];
   } 
   catch (error) {
